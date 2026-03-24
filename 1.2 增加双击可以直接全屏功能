@@ -1,0 +1,690 @@
+<?php
+/**
+ * 全屏颜色展示器 - 自适应：电脑端全屏API / 手机端页面沉浸模式
+ * 新增：电脑端双击预设颜色圆点直接全屏
+ */
+?>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>全屏颜色展示器 | 自适应沉浸</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: #000000;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, 'Inter', 'Roboto', sans-serif;
+            padding: 1.5rem;
+            position: relative;
+            overflow-x: hidden;
+            transition: background-color 0.2s ease;
+        }
+
+        /* 主卡片容器 */
+        .glass-panel {
+            background: rgba(10, 10, 10, 0.6);
+            backdrop-filter: blur(12px);
+            border-radius: 2.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            padding: 2rem 2rem 2.5rem;
+            width: 100%;
+            max-width: 560px;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        /* 手机端沉浸模式时隐藏所有UI */
+        body.immersive-mode .glass-panel {
+            display: none;
+        }
+        body.immersive-mode footer {
+            display: none;
+        }
+
+        .color-preview-area {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 1.8rem;
+            padding: 1.2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .current-color-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 0.8rem;
+        }
+
+        .color-swatch {
+            width: 100%;
+            height: 110px;
+            border-radius: 1.5rem;
+            background: #000000;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.2s ease;
+            margin-bottom: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+        }
+
+        .color-hex {
+            font-family: 'SF Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 600;
+            background: rgba(0, 0, 0, 0.6);
+            display: inline-block;
+            padding: 0.4rem 1.2rem;
+            border-radius: 60px;
+            letter-spacing: 1px;
+            color: white;
+            backdrop-filter: blur(4px);
+        }
+
+        .play-section {
+            margin: 2rem 0 1.8rem;
+        }
+
+        .click-hint {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.65);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 6px #fff;
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+            border: none;
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.2);
+            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.03);
+            box-shadow: 0 25px 40px -10px black;
+        }
+
+        .play-btn:active {
+            transform: scale(0.97);
+        }
+
+        .play-icon {
+            font-size: 3.8rem;
+            margin-left: 8px;
+            color: #1e1e2f;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+        }
+
+        .play-text {
+            margin-top: 1rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+
+        .control-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 80px;
+            padding: 0.6rem 1.5rem;
+            margin: 1.5rem 0 1.2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .wake-lock-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(30, 30, 40, 0.7);
+            padding: 0.4rem 1rem;
+            border-radius: 50px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #3a3a4a;
+            transition: 0.3s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4caf50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .lock-label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #ddd;
+        }
+
+        .more-color-btn {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 0.5rem 1.4rem;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .more-color-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(0.97);
+        }
+
+        .preset-colors {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 1.2rem;
+        }
+
+        .preset-dot {
+            width: 44px;
+            height: 44px;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .preset-dot:hover {
+            transform: scale(1.12);
+            border-color: white;
+        }
+
+        .preset-dot.active-preset {
+            transform: scale(1.1);
+            border: 3px solid white;
+            box-shadow: 0 0 12px rgba(255,255,240,0.6);
+        }
+
+        #hiddenColorPicker {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+            pointer-events: none;
+        }
+
+        /* 电脑端全屏覆盖层 - 无文字 */
+        .fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            z-index: 9999;
+            display: none;
+            cursor: pointer;
+            transition: background-color 0.1s linear;
+        }
+
+        footer {
+            font-size: 0.7rem;
+            color: #aaa;
+            margin-top: 2rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="glass-panel">
+    <div class="color-preview-area">
+        <div class="current-color-label">当前颜色</div>
+        <div class="color-swatch" id="colorSwatch"></div>
+        <div class="color-hex" id="colorHexValue">#000000</div>
+    </div>
+
+    <div class="play-section">
+        <div class="click-hint">
+            <span class="dot"></span>
+            <span>点击此处：</span>
+            <span class="dot"></span>
+        </div>
+        <button class="play-btn" id="playFullscreenBtn">
+            <span class="play-icon">▶</span>
+        </button>
+        <div class="play-text">以全屏运行</div>
+    </div>
+
+    <div class="control-bar">
+        <div class="wake-lock-item">
+            <span class="lock-label">🔆 保持屏幕打开</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="wakeLockToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <button class="more-color-btn" id="moreColorBtn">
+            🎨 更多颜色
+        </button>
+    </div>
+
+    <div class="preset-colors" id="presetColorsContainer"></div>
+    <footer>点击播放 ▶ 全屏沉浸色彩 · 双击颜色区域或预设颜色也可全屏（电脑端） · 单击画面或按 ESC 退出</footer>
+</div>
+
+<!-- 电脑端全屏覆盖层 -->
+<div id="fullscreenOverlay" class="fullscreen-overlay"></div>
+
+<input type="color" id="hiddenColorPicker" value="#000000">
+
+<script>
+    (function(){
+        // ---------- 更可靠的移动端检测 ----------
+        const isMobile = () => {
+            const ua = navigator.userAgent.toLowerCase();
+            const mobileKeywords = ['android', 'iphone', 'ipod', 'ipad', 'windows phone', 'mobile'];
+            const isMobileUA = mobileKeywords.some(keyword => ua.includes(keyword));
+            const isSmallScreen = window.innerWidth <= 768;
+            const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            return isMobileUA || (isSmallScreen && hasTouch);
+        };
+
+        const mobileDetected = isMobile();
+        
+        // DOM 元素
+        const colorSwatch = document.getElementById('colorSwatch');
+        const colorHexSpan = document.getElementById('colorHexValue');
+        const playBtn = document.getElementById('playFullscreenBtn');
+        const fullscreenOverlay = document.getElementById('fullscreenOverlay');
+        const moreColorBtn = document.getElementById('moreColorBtn');
+        const hiddenColorPicker = document.getElementById('hiddenColorPicker');
+        const wakeLockToggle = document.getElementById('wakeLockToggle');
+        const presetContainer = document.getElementById('presetColorsContainer');
+        const body = document.body;
+
+        // 全局变量
+        let currentColor = '#000000';
+        let wakeLock = null;
+        let isWakeLockActive = false;
+        let isFullscreenActive = false;      // 电脑端全屏状态
+        let isImmersive = false;             // 手机端沉浸模式状态
+        let immersiveExitHandler = null;     // 保存退出处理函数引用
+
+        // 预设颜色
+        const presetColors = [
+            '#000000', '#ff4757', '#ff8c42', '#f9ca24', '#2ed573',
+            '#1e90ff', '#5f27cd', '#ff6b81', '#00d2d3', '#ffffff'
+        ];
+
+        // 更新UI：色块、文字、body背景（手机沉浸模式下body背景已单独控制，但为了统一更新也设置）
+        function updateColorUI() {
+            colorSwatch.style.backgroundColor = currentColor;
+            colorHexSpan.innerText = currentColor.toUpperCase();
+            body.style.backgroundColor = currentColor;
+            if (!mobileDetected && fullscreenOverlay.style.display === 'flex') {
+                fullscreenOverlay.style.backgroundColor = currentColor;
+            }
+            highlightActivePreset();
+        }
+
+        function highlightActivePreset() {
+            const allPresetDots = document.querySelectorAll('.preset-dot');
+            allPresetDots.forEach(dot => {
+                const colorVal = dot.getAttribute('data-color');
+                if (colorVal && colorVal.toLowerCase() === currentColor.toLowerCase()) {
+                    dot.classList.add('active-preset');
+                } else {
+                    dot.classList.remove('active-preset');
+                }
+            });
+        }
+
+        function setColor(newColor) {
+            if (!newColor) return;
+            currentColor = newColor;
+            updateColorUI();
+            if (hiddenColorPicker.value !== currentColor) {
+                hiddenColorPicker.value = currentColor;
+            }
+            if (mobileDetected && isImmersive) {
+                body.style.backgroundColor = currentColor;
+            }
+        }
+
+        // ---------- 电脑端全屏功能 ----------
+        async function enterDesktopFullscreen() {
+            fullscreenOverlay.style.backgroundColor = currentColor;
+            fullscreenOverlay.style.display = 'flex';
+            const elem = fullscreenOverlay;
+            const requestMethod = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.msRequestFullscreen;
+            if (requestMethod) {
+                try {
+                    await requestMethod.call(elem);
+                    isFullscreenActive = true;
+                } catch (err) {
+                    console.warn("全屏请求失败: ", err);
+                    fullscreenOverlay.style.display = 'none';
+                    alert("全屏模式不受支持，请允许全屏或使用现代浏览器。");
+                }
+            } else {
+                alert("您的浏览器不支持全屏API");
+                fullscreenOverlay.style.display = 'none';
+            }
+        }
+
+        async function exitDesktopFullscreen() {
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                const exitMethod = document.exitFullscreen || document.webkitExitFullscreen;
+                if (exitMethod) {
+                    await exitMethod.call(document);
+                }
+            }
+            fullscreenOverlay.style.display = 'none';
+            isFullscreenActive = false;
+        }
+
+        function onFullscreenChange() {
+            const isNowFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
+            if (!isNowFullscreen) {
+                if (fullscreenOverlay.style.display === 'flex') {
+                    fullscreenOverlay.style.display = 'none';
+                }
+                isFullscreenActive = false;
+            } else {
+                if (fullscreenOverlay.style.display === 'flex') {
+                    fullscreenOverlay.style.backgroundColor = currentColor;
+                }
+                isFullscreenActive = true;
+            }
+        }
+
+        // ---------- 手机端沉浸模式（修复版）----------
+        function exitMobileImmersive() {
+            if (!isImmersive) return;
+            body.classList.remove('immersive-mode');
+            body.style.backgroundColor = currentColor;
+            isImmersive = false;
+            if (immersiveExitHandler) {
+                document.removeEventListener('click', immersiveExitHandler);
+                document.removeEventListener('touchend', immersiveExitHandler);
+                immersiveExitHandler = null;
+            }
+        }
+
+        function createExitHandler() {
+            return function(event) {
+                exitMobileImmersive();
+            };
+        }
+
+        function enterMobileImmersive() {
+            if (isImmersive) return;
+            if (immersiveExitHandler) {
+                document.removeEventListener('click', immersiveExitHandler);
+                document.removeEventListener('touchend', immersiveExitHandler);
+            }
+            body.classList.add('immersive-mode');
+            body.style.backgroundColor = currentColor;
+            isImmersive = true;
+            
+            setTimeout(() => {
+                if (isImmersive) {
+                    immersiveExitHandler = createExitHandler();
+                    document.addEventListener('click', immersiveExitHandler);
+                    document.addEventListener('touchend', immersiveExitHandler);
+                }
+            }, 100);
+        }
+
+        // ---------- 播放按钮统一调度 ----------
+        async function onPlayClick() {
+            if (mobileDetected) {
+                enterMobileImmersive();
+            } else {
+                if (isFullscreenActive && fullscreenOverlay.style.display === 'flex') {
+                    fullscreenOverlay.style.backgroundColor = currentColor;
+                    return;
+                }
+                await enterDesktopFullscreen();
+            }
+        }
+
+        // 电脑端全屏覆盖层点击退出
+        function onOverlayClick() {
+            if (!mobileDetected) {
+                if (document.fullscreenElement || document.webkitFullscreenElement) {
+                    exitDesktopFullscreen();
+                } else {
+                    fullscreenOverlay.style.display = 'none';
+                    isFullscreenActive = false;
+                }
+            }
+        }
+
+        // 键盘ESC退出
+        function onKeyDown(e) {
+            if (!mobileDetected && e.key === 'Escape' && fullscreenOverlay.style.display === 'flex') {
+                if (document.fullscreenElement) {
+                    exitDesktopFullscreen();
+                } else {
+                    fullscreenOverlay.style.display = 'none';
+                    isFullscreenActive = false;
+                }
+            }
+            if (mobileDetected && e.key === 'Escape' && isImmersive) {
+                exitMobileImmersive();
+            }
+        }
+
+        // ---------- 唤醒锁 ----------
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    isWakeLockActive = true;
+                    wakeLock.addEventListener('release', () => {
+                        isWakeLockActive = false;
+                        if (wakeLockToggle.checked) {
+                            wakeLockToggle.checked = false;
+                        }
+                    });
+                } catch (err) {
+                    console.error("唤醒锁请求失败: ", err);
+                    isWakeLockActive = false;
+                    wakeLockToggle.checked = false;
+                    alert("保持屏幕打开不支持当前环境。");
+                }
+            } else {
+                alert("您的浏览器不支持屏幕常亮功能");
+                wakeLockToggle.checked = false;
+            }
+        }
+
+        async function releaseWakeLock() {
+            if (wakeLock && isWakeLockActive) {
+                try {
+                    await wakeLock.release();
+                    wakeLock = null;
+                    isWakeLockActive = false;
+                } catch (err) {
+                    console.error("释放唤醒锁失败", err);
+                }
+            } else {
+                wakeLock = null;
+                isWakeLockActive = false;
+            }
+        }
+
+        async function onWakeLockToggle(e) {
+            if (wakeLockToggle.checked) {
+                await requestWakeLock();
+            } else {
+                await releaseWakeLock();
+            }
+        }
+
+        async function handleVisibilityChange() {
+            if (wakeLockToggle.checked && document.visibilityState === 'visible') {
+                if (!isWakeLockActive || !wakeLock) {
+                    await requestWakeLock();
+                }
+            }
+        }
+
+        // ---------- 预设颜色构建 ----------
+        function buildPresetColors() {
+            presetContainer.innerHTML = '';
+            presetColors.forEach(color => {
+                const colorCircle = document.createElement('div');
+                colorCircle.className = 'preset-dot';
+                colorCircle.style.backgroundColor = color;
+                colorCircle.setAttribute('data-color', color);
+                // 单击：切换颜色
+                colorCircle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    setColor(color);
+                });
+                // 电脑端双击：切换颜色并全屏
+                if (!mobileDetected) {
+                    colorCircle.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        setColor(color);          // 先更新颜色
+                        enterDesktopFullscreen(); // 再全屏显示
+                    });
+                }
+                presetContainer.appendChild(colorCircle);
+            });
+            highlightActivePreset();
+        }
+
+        function openColorPicker() {
+            hiddenColorPicker.click();
+        }
+
+        function onColorPickerChange(e) {
+            setColor(e.target.value);
+        }
+
+        // 初始化
+        function init() {
+            setColor('#000000');
+            buildPresetColors();
+
+            playBtn.addEventListener('click', onPlayClick);
+            moreColorBtn.addEventListener('click', openColorPicker);
+            hiddenColorPicker.addEventListener('input', onColorPickerChange);
+            wakeLockToggle.addEventListener('change', onWakeLockToggle);
+            
+            if (!mobileDetected) {
+                // 电脑端：全屏覆盖层点击退出 + 全屏变化监听
+                fullscreenOverlay.addEventListener('click', onOverlayClick);
+                document.addEventListener('fullscreenchange', onFullscreenChange);
+                document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+                
+                // 双击颜色预览区直接全屏
+                if (colorSwatch) {
+                    colorSwatch.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        if (!(isFullscreenActive && fullscreenOverlay.style.display === 'flex')) {
+                            enterDesktopFullscreen();
+                        }
+                    });
+                }
+            }
+            
+            window.addEventListener('keydown', onKeyDown);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+
+            window.addEventListener('resize', () => {
+                if (!mobileDetected) {
+                    if (!(document.fullscreenElement || document.webkitFullscreenElement) && fullscreenOverlay.style.display === 'flex') {
+                        fullscreenOverlay.style.display = 'none';
+                        isFullscreenActive = false;
+                    }
+                }
+            });
+
+            console.log("初始化完成，设备类型:", mobileDetected ? "手机端 (沉浸模式)" : "电脑端 (全屏模式)");
+        }
+
+        init();
+    })();
+</script>
+</body>
+</html>
